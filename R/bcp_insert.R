@@ -42,11 +42,16 @@ bcp_insert <- function(input_data,
 
   # --- 1. Validation ---
   cli::cli_progress_step("Reading input data", msg_done = "Data loaded")
-  checkmate::assert_choice(class(input_data)[1], c("data.frame", "data.table", "character"))
+  checkmate::assert_choice(
+    class(input_data)[1],
+    c("data.frame", "data.table", "character")
+  )
 
   if (is.character(input_data) &&
     grepl("\\.parquet$", input_data, ignore.case = TRUE)) {
-    if (!file.exists(input_data)) stop("Parquet file not found.")
+    if (!file.exists(input_data)) {
+      stop("Parquet file not found.")
+    }
     dt <- data.table::as.data.table(arrow::read_parquet(input_data))
   } else {
     dt <- data.table::as.data.table(input_data)
@@ -58,7 +63,10 @@ bcp_insert <- function(input_data,
   con_str <- glue::glue(
     "Driver={{ODBC Driver 17 for SQL Server}};",
     "Server={server};Database={database};",
-    ifelse(trusted_connection, "Trusted_Connection=yes;", glue::glue("Uid={username};Pwd={password};"))
+    ifelse(trusted_connection,
+      "Trusted_Connection=yes;",
+      glue::glue("Uid={username};Pwd={password};")
+    )
   )
 
   con <- tryCatch(
@@ -75,7 +83,9 @@ bcp_insert <- function(input_data,
 
   # --- 3. Overwrite / Append Logic ---
   if (overwrite) {
-    cli::cli_alert_warning(glue::glue("Overwrite mode enabled. Truncating {schema}.{table}..."))
+    cli::cli_alert_warning(
+      glue::glue("Overwrite mode enabled. Truncating {schema}.{table}...")
+    )
     tryCatch(
       {
         DBI::dbExecute(con, glue::glue("TRUNCATE TABLE {schema}.{table}"))
@@ -86,16 +96,25 @@ bcp_insert <- function(input_data,
       }
     )
   } else {
-    cli::cli_alert_info(glue::glue("Append mode enabled. Adding to existing data in {schema}.{table}."))
+    cli::cli_alert_info(
+      glue::glue(
+        "Append mode enabled.",
+        "Adding to existing data in {schema}.{table}."
+      )
+    )
   }
 
   # --- 4. Schema Alignment ---
   cli::cli_progress_step("Aligning schema")
   db_cols <- get_table_schema(con, table, schema)
-  if (nrow(db_cols) == 0) stop(glue::glue("Table {schema}.{table} not found."))
+  if (nrow(db_cols) == 0) {
+    stop(glue::glue("Table {schema}.{table} not found."))
+  }
 
   missing_cols <- setdiff(db_cols$COLUMN_NAME, names(dt))
-  if (length(missing_cols) > 0) stop("Missing columns: ", paste(missing_cols, collapse = ", "))
+  if (length(missing_cols) > 0) {
+    stop("Missing columns: ", paste(missing_cols, collapse = ", "))
+  }
 
   data.table::setcolorder(dt, db_cols$COLUMN_NAME)
   dt <- dt[, .SD, .SDcols = db_cols$COLUMN_NAME]
@@ -106,35 +125,19 @@ bcp_insert <- function(input_data,
   dt <- format_for_bcp(dt)
   temp_file <- tempfile(fileext = ".dat", tmpdir = tmpdir)
   on.exit(unlink(temp_file), add = TRUE)
-
-  field_term <- "\x1f"
-  row_term <- "\n"
-  cli::cli_progress_done()
-  cli::cli_progress_step("Converting datetimes to strings")
-
-  cols <- names(dt)[sapply(dt, inherits, "POSIXct")]
-  # Apply transformation by reference (in-place)
-  if (FALSE) {
-    dt[, (cols) := lapply(.SD, clock::date_format, format = "%Y-%m-%d %H:%M:%S"), .SDcols = cols]
-  } else if (FALSE) {
-    dt[, (cols) := lapply(.SD, stringi::stri_datetime_format, format = "yyyy-MM-dd HH:mm:ss"), .SDcols = cols]
-  } else if (TRUE) {
-    format_fast_ODBC <- function(x) {
-      u_x <- unique(x)
-      # Format uniques only once
-      u_fmt <- clock::date_format(u_x, format = "%Y-%m-%d %H:%M:%S")
-      # Map back using fast integer matching
-      u_fmt[match(x, u_x)]
-    }
-    dt[, (cols) := lapply(.SD, format_fast_ODBC), .SDcols = cols]
-  }
   cli::cli_progress_done()
 
   cli::cli_progress_step("Writing {temp_file} ")
+  field_term <- "\x1f"
+  row_term <- "\n"
+
   data.table::fwrite(dt,
-    file = temp_file, sep = field_term, eol = row_term,
-    col.names = FALSE, quote = FALSE, na = "",
-    # dateTimeAs = "write.csv",
+    file = temp_file,
+    sep = field_term,
+    eol = row_term,
+    col.names = FALSE,
+    quote = FALSE,
+    na = "",
     nThread = parallel::detectCores() - 1,
     buffMB = 512,
     showProgress = TRUE,
@@ -143,8 +146,12 @@ bcp_insert <- function(input_data,
   cli::cli_progress_done()
 
   # --- 6. Execute BCP ---
-  cli::cli_progress_step("Running BCP")
-  auth_flag <- if (trusted_connection) "-T" else glue::glue("-U {username} -P {password}")
+  cli::cli_progress_step("Inserting data to server using bcp")
+  auth_flag <- if (trusted_connection) {
+    "-T"
+  } else {
+    glue::glue("-U {username} -P {password}")
+  }
   full_table_name <- glue::glue("{database}.{schema}.{table}")
 
   args <- c(
@@ -168,7 +175,9 @@ bcp_insert <- function(input_data,
         echo = TRUE
       )
     },
-    error = function(e) stop("Could not spawn BCP process.")
+    error = function(e) {
+      stop("Could not spawn BCP process.")
+    }
   )
 
   if (result$status != 0) {

@@ -29,5 +29,18 @@ format_for_bcp <- function(dt) {
       data.table::set(dt, j = j, value = as.integer(dt[[j]]))
     }
   }
+
+  # Convert POSIXct to strings in ODBC format
+  format_fast_ODBC <- function(x) {
+    u_x <- unique(x)
+    # Format uniques only once
+    u_fmt <- clock::date_format(u_x, format = "%Y-%m-%d %H:%M:%S")
+    # Map back using fast integer matching
+    u_fmt[match(x, u_x)]
+  }
+
+  cols <- names(dt)[sapply(dt, inherits, "POSIXct")]
+  dt[, (cols) := lapply(.SD, format_fast_ODBC), .SDcols = cols]
+
   return(dt)
 }
