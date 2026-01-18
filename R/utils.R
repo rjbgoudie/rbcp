@@ -1,5 +1,7 @@
 #' Get Table Schema
 #' @keywords internal
+#' @importFrom DBI dbGetQuery
+#' @importFrom glue glue
 get_table_schema <- function(con, table_name, schema_name = "dbo") {
   query <- glue::glue("
     SELECT COLUMN_NAME, DATA_TYPE
@@ -16,6 +18,7 @@ get_table_schema <- function(con, table_name, schema_name = "dbo") {
 #' Only handles Logical -> Integer conversion.
 #' Date/Time/NA formatting is now handled by fwrite for performance.
 #' @keywords internal
+#' @importFrom data.table set
 format_for_bcp <- function(dt) {
   # Fast in-place modification
   # We only scan for logicals. Everything else is handled by C-code in fwrite.

@@ -11,7 +11,19 @@
 #' @param trusted_connection Boolean. Use Windows Authentication? Default TRUE.
 #' @param bcp_path Path to bcp executable. Default assumes it is in system PATH.
 #' @param batch_size Number of rows per batch.
+#' @param tmpdir Directory for temporary files.
+#' @param packet_size Network packet size in bytes.
 #'
+#' @importFrom arrow read_parquet
+#' @importFrom checkmate assert_choice
+#' @importFrom cli cli_alert_danger cli_alert_info cli_alert_success cli_alert_warning cli_code cli_h1 cli_progress_done cli_progress_step
+#' @importFrom clock date_format
+#' @importFrom data.table := as.data.table fwrite setcolorder
+#' @importFrom DBI dbConnect dbDisconnect dbExecute
+#' @importFrom glue glue
+#' @importFrom odbc odbc
+#' @importFrom parallel detectCores
+#' @importFrom processx run
 #' @export
 bcp_insert <- function(input_data,
                        server,
