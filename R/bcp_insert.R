@@ -38,7 +38,6 @@ bcp_insert <- function(input_data,
                        batch_size = 1000000L,
                        tmpdir = tempdir(),
                        packet_size = 4096L) {
-
   cli::cli_h1(glue::glue("BCP insert: {schema}.{table}"))
 
   # --- 1. Validation ---
@@ -46,7 +45,7 @@ bcp_insert <- function(input_data,
   checkmate::assert_choice(class(input_data)[1], c("data.frame", "data.table", "character"))
 
   if (is.character(input_data) &&
-      grepl("\\.parquet$", input_data, ignore.case = TRUE)) {
+    grepl("\\.parquet$", input_data, ignore.case = TRUE)) {
     if (!file.exists(input_data)) stop("Parquet file not found.")
     dt <- data.table::as.data.table(arrow::read_parquet(input_data))
   } else {
@@ -62,24 +61,30 @@ bcp_insert <- function(input_data,
     ifelse(trusted_connection, "Trusted_Connection=yes;", glue::glue("Uid={username};Pwd={password};"))
   )
 
-  con <- tryCatch({
-    DBI::dbConnect(odbc::odbc(), .connection_string = con_str)
-  }, error = function(e) {
-    cli::cli_progress_done(result = "failed")
-    stop("Connection failed: ", e$message)
-  })
+  con <- tryCatch(
+    {
+      DBI::dbConnect(odbc::odbc(), .connection_string = con_str)
+    },
+    error = function(e) {
+      cli::cli_progress_done(result = "failed")
+      stop("Connection failed: ", e$message)
+    }
+  )
   on.exit(DBI::dbDisconnect(con), add = TRUE)
   cli::cli_progress_done()
 
   # --- 3. Overwrite / Append Logic ---
   if (overwrite) {
     cli::cli_alert_warning(glue::glue("Overwrite mode enabled. Truncating {schema}.{table}..."))
-    tryCatch({
-      DBI::dbExecute(con, glue::glue("TRUNCATE TABLE {schema}.{table}"))
-      cli::cli_alert_success("Table truncated.")
-    }, error = function(e) {
-      stop("Failed to truncate table. Check permissions.")
-    })
+    tryCatch(
+      {
+        DBI::dbExecute(con, glue::glue("TRUNCATE TABLE {schema}.{table}"))
+        cli::cli_alert_success("Table truncated.")
+      },
+      error = function(e) {
+        stop("Failed to truncate table. Check permissions.")
+      }
+    )
   } else {
     cli::cli_alert_info(glue::glue("Append mode enabled. Adding to existing data in {schema}.{table}."))
   }
@@ -109,11 +114,11 @@ bcp_insert <- function(input_data,
 
   cols <- names(dt)[sapply(dt, inherits, "POSIXct")]
   # Apply transformation by reference (in-place)
-  if (FALSE){
-  dt[, (cols) := lapply(.SD, clock::date_format, format = "%Y-%m-%d %H:%M:%S"), .SDcols = cols]
+  if (FALSE) {
+    dt[, (cols) := lapply(.SD, clock::date_format, format = "%Y-%m-%d %H:%M:%S"), .SDcols = cols]
   } else if (FALSE) {
     dt[, (cols) := lapply(.SD, stringi::stri_datetime_format, format = "yyyy-MM-dd HH:mm:ss"), .SDcols = cols]
-  } else if (TRUE){
+  } else if (TRUE) {
     format_fast_ODBC <- function(x) {
       u_x <- unique(x)
       # Format uniques only once
@@ -126,13 +131,15 @@ bcp_insert <- function(input_data,
   cli::cli_progress_done()
 
   cli::cli_progress_step("Writing {temp_file} ")
-  data.table::fwrite(dt, file = temp_file, sep = field_term, eol = row_term,
-                     col.names = FALSE, quote = FALSE, na = "",
-                     #dateTimeAs = "write.csv",
-                     nThread = parallel::detectCores() - 1,
-                     buffMB = 512,
-                     showProgress = TRUE,
-                     verbose = TRUE)
+  data.table::fwrite(dt,
+    file = temp_file, sep = field_term, eol = row_term,
+    col.names = FALSE, quote = FALSE, na = "",
+    # dateTimeAs = "write.csv",
+    nThread = parallel::detectCores() - 1,
+    buffMB = 512,
+    showProgress = TRUE,
+    verbose = TRUE
+  )
   cli::cli_progress_done()
 
   # --- 6. Execute BCP ---
@@ -140,23 +147,29 @@ bcp_insert <- function(input_data,
   auth_flag <- if (trusted_connection) "-T" else glue::glue("-U {username} -P {password}")
   full_table_name <- glue::glue("{database}.{schema}.{table}")
 
-  args <- c(full_table_name,
-            "in", temp_file,
-            if (trusted_connection) "-T" else c("-U", username, "-P", password),
-            "-S", server,
-            "-c",
-            "-t", field_term,
-            "-r", row_term,
-            "-C", "65001",
-            "-b", as.character(batch_size),
-            "-a", packet_size)
+  args <- c(
+    full_table_name,
+    "in", temp_file,
+    if (trusted_connection) "-T" else c("-U", username, "-P", password),
+    "-S", server,
+    "-c",
+    "-t", field_term,
+    "-r", row_term,
+    "-C", "65001",
+    "-b", as.character(batch_size),
+    "-a", packet_size
+  )
 
-  result <- tryCatch({
-    processx::run(bcp_path, unlist(args),
-                  error_on_status = FALSE,
-                  echo_cmd = FALSE,
-                  echo = TRUE)
-  }, error = function(e) stop("Could not spawn BCP process."))
+  result <- tryCatch(
+    {
+      processx::run(bcp_path, unlist(args),
+        error_on_status = FALSE,
+        echo_cmd = FALSE,
+        echo = TRUE
+      )
+    },
+    error = function(e) stop("Could not spawn BCP process.")
+  )
 
   if (result$status != 0) {
     cli::cli_progress_done(result = "failed")

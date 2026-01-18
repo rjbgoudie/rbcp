@@ -5,8 +5,8 @@
 get_table_schema <- function(con, table_name, schema_name = "dbo") {
   query <- glue::glue("
     SELECT COLUMN_NAME, DATA_TYPE
-    FROM INFORMATION_SCHEMA.COLUMNS 
-    WHERE TABLE_NAME = '{table_name}' 
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_NAME = '{table_name}'
       AND TABLE_SCHEMA = '{schema_name}'
     ORDER BY ORDINAL_POSITION
   ")
@@ -14,7 +14,7 @@ get_table_schema <- function(con, table_name, schema_name = "dbo") {
 }
 
 #' Sanitize Data for BCP
-#' 
+#'
 #' Only handles Logical -> Integer conversion.
 #' Date/Time/NA formatting is now handled by fwrite for performance.
 #' @keywords internal
