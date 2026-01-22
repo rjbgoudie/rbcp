@@ -2,7 +2,7 @@
 % Please edit documentation in R/bcp_insert.R
 \name{bcp_insert}
 \alias{bcp_insert}
-\title{Bulk Insert Data into SQL Server}
+\title{Bulk Insert Data into SQL Server using bcp}
 \usage{
 bcp_insert(
   input_data,
@@ -21,32 +21,98 @@ bcp_insert(
 )
 }
 \arguments{
-\item{input_data}{A data.frame, data.table, or path to a .parquet file.}
+\item{input_data}{A `data.frame`, `data.table`, or a character string specifying the path to a `.parquet` file. The data to be inserted.}
 
-\item{server}{SQL Server instance name.}
+\item{server}{The name of the SQL Server instance to connect to.}
 
-\item{database}{Database name.}
+\item{database}{The name of the database containing the target table.}
 
-\item{table}{Target table name.}
+\item{table}{The name of the target table for the bulk insert operation.}
 
-\item{schema}{Target schema name (default "dbo").}
+\item{schema}{The schema of the target table. Defaults to `"dbo"`.}
 
-\item{overwrite}{Boolean. If TRUE, table is TRUNCATED before insert. Default FALSE.}
+\item{overwrite}{A boolean value. If `TRUE`, the target table will be truncated before inserting the new data. If `FALSE` (the default), the new data will be appended.}
 
-\item{username}{SQL authentication username (optional).}
+\item{username}{The username for SQL Server Authentication. Not required if `trusted_connection = TRUE`.}
 
-\item{password}{SQL authentication password (optional).}
+\item{password}{The password for SQL Server Authentication. Not required if `trusted_connection = TRUE`.}
 
-\item{trusted_connection}{Boolean. Use Windows Authentication? Default TRUE.}
+\item{trusted_connection}{A boolean value. If `TRUE` (the default), Windows Authentication will be used. If `FALSE`, SQL Server Authentication will be used (requires `username` and `password`).}
 
-\item{bcp_path}{Path to bcp executable. Default assumes it is in system PATH.}
+\item{bcp_path}{The path to the `bcp` executable. Defaults to `"bcp"`, assuming it is in the system's PATH.}
 
-\item{batch_size}{Number of rows per batch.}
+\item{batch_size}{The number of rows per batch for the `bcp` operation. Defaults to `1,000,000`.}
 
-\item{tmpdir}{Directory for temporary files.}
+\item{tmpdir}{The directory where the temporary data file will be created. Defaults to `tempdir()`.}
 
-\item{packet_size}{Network packet size in bytes.}
+\item{packet_size}{The network packet size (in bytes) for the `bcp` connection. Defaults to `4096`.}
+}
+\value{
+The function is called for its side effects and does not return a value. It will stop with an error if the operation fails.
 }
 \description{
-Bulk Insert Data into SQL Server
+This function provides a high-performance method for bulk inserting data into a
+SQL Server table. It acts as a wrapper around the SQL Server command-line
+utility `bcp`, handling data serialization, schema validation, and the
+execution of the `bcp` process.
+}
+\details{
+The function performs the following steps:
+\enumerate{
+  \item **Input Validation:** Checks if the input is a `data.frame`, `data.table`, or a path to a `.parquet` file.
+  \item **Database Connection:** Connects to the SQL Server database using ODBC.
+  \item **Overwrite Logic:** If `overwrite = TRUE`, it truncates the target table.
+  \item **Schema Alignment:** It retrieves the schema of the target table and reorders the columns of the input data to match. It will stop if any columns from the SQL table are missing in the input data.
+  \item **Data Staging:** The data is written to a temporary, UTF-8 encoded, delimited file. `data.table::fwrite` is used for high performance.
+  \item **BCP Execution:** The `bcp` command-line utility is called to insert the data from the temporary file into the target SQL Server table.
+}
+
+Authentication can be done using either Windows Authentication (`trusted_connection = TRUE`) or SQL Server Authentication (by providing `username` and `password`).
+}
+\examples{
+\dontrun{
+# Create a sample data frame
+my_data <- data.frame(
+  ID = 1:10,
+  Name = letters[1:10],
+  Value = rnorm(10),
+  InsertDate = as.POSIXct(Sys.Date())
+)
+
+# Perform a bulk insert using Windows Authentication
+bcp_insert(
+  input_data = my_data,
+  server = "MY_SQL_SERVER",
+  database = "MyDatabase",
+  table = "MyTable",
+  schema = "dbo",
+  overwrite = TRUE
+)
+
+# Perform a bulk insert using SQL Server Authentication
+bcp_insert(
+  input_data = my_data,
+  server = "MY_SQL_SERVER",
+  database = "MyDatabase",
+  table = "MyTable",
+  schema = "dbo",
+  overwrite = FALSE,
+  username = "my_user",
+  password = "my_password",
+  trusted_connection = FALSE
+)
+
+# Insert from a Parquet file
+arrow::write_parquet(my_data, "my_data.parquet")
+bcp_insert(
+  input_data = "my_data.parquet",
+  server = "MY_SQL_SERVER",
+  database = "MyDatabase",
+  table = "MyTable"
+)
+}
+
+}
+\seealso{
+Microsoft's documentation for the `bcp` utility: \url{https://docs.microsoft.com/en-us/sql/tools/bcp-utility}
 }
