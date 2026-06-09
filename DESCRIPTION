@@ -13,7 +13,8 @@ Imports:
     checkmate,
     glue,
     cli,
-    processx
+    processx,
+    clock
 Suggests:
     testthat,
     mockery
