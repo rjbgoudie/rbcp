@@ -19,6 +19,7 @@ get_table_schema <- function(con, table_name, schema_name = "dbo") {
 #' Date/Time/NA formatting is now handled by fwrite for performance.
 #' @keywords internal
 #' @importFrom data.table set
+#' @importFrom clock date_format
 format_for_bcp <- function(dt) {
   # Fast in-place modification
   # We only scan for logicals. Everything else is handled by C-code in fwrite.
