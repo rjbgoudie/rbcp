@@ -83,7 +83,6 @@
 #' @importFrom arrow read_parquet
 #' @importFrom checkmate assert_choice
 #' @importFrom cli cli_alert_danger cli_alert_info cli_alert_success cli_alert_warning cli_code cli_h1 cli_progress_done cli_progress_step
-#' @importFrom clock date_format
 #' @importFrom data.table := as.data.table fwrite setcolorder
 #' @importFrom DBI dbConnect dbDisconnect dbExecute
 #' @importFrom glue glue
